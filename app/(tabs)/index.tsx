@@ -145,7 +145,6 @@ export default function MainPage() {
     { name: "Nightlife", icon: "moon" },
     { name: "Museums", icon: "book-open" },
     { name: "Adventure", icon: "activity" },
-    { name: "Family-Friendly", icon: "smile" },
     { name: "Transportation", icon: "truck" },
     { name: "Events", icon: "calendar" },
   ];

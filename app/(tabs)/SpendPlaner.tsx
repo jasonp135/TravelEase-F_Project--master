@@ -8,9 +8,9 @@ import {
   ScrollView,
   Alert,
   RefreshControl,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-
 
 // Define expense type
 type Expense = {
@@ -27,6 +27,9 @@ type Category = {
   icon: string;
 };
 
+// Chart type enum
+type ChartType = "list" | "visual";
+
 export default function SpendPlanner() {
   // State for expenses and form inputs
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -36,7 +39,10 @@ export default function SpendPlanner() {
   const [totalSpent, setTotalSpent] = useState(0);
   const [currency, setCurrency] = useState("HKD");
   const [refreshing, setRefreshing] = useState(false);
+  const [chartType, setChartType] = useState<ChartType>("list");
 
+  // Screen width for charts
+  const screenWidth = Dimensions.get("window").width - 70;
 
   // Available expense categories
   const categories: Category[] = [
@@ -46,6 +52,16 @@ export default function SpendPlanner() {
     { name: "Shopping", icon: "cart" },
     { name: "Attractions", icon: "ticket" },
     { name: "Other", icon: "ellipsis-horizontal" },
+  ];
+
+  // Chart colors
+  const chartColors = [
+    "#FF6384", // Red
+    "#36A2EB", // Blue
+    "#FFCE56", // Yellow
+    "#4BC0C0", // Teal
+    "#9966FF", // Purple
+    "#FF9F40", // Orange
   ];
 
   // Calculate total spent whenever expenses change
@@ -96,34 +112,40 @@ export default function SpendPlanner() {
 
   const categoryTotals = getSpendingByCategory();
 
+  // Get the maximum amount for any category (for bar scaling)
+  const getMaxAmount = () => {
+    return Math.max(...Object.values(categoryTotals), 1);
+  };
+
   // Handle refresh
-    const onRefresh = async () => {
-        setRefreshing(true);
-        
-        try {
-            // Simulate data fetching
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            setRefreshing(false);
-        } catch (error) {
-            console.error('Refresh failed:', error);
-            setRefreshing(false);
-        }
-    };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    
+    try {
+      // Simulate data fetching
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setRefreshing(false);
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      setRefreshing(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
-                        <ScrollView 
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={["#6C63FF"]}
-                        tintColor="#6C63FF"
-                        titleColor="#6C63FF"
-                    />
-                }>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#6C63FF"]}
+            tintColor="#6C63FF"
+            titleColor="#6C63FF"
+          />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Spend Planner</Text>
@@ -222,30 +244,122 @@ export default function SpendPlanner() {
 
         {/* Expense Breakdown */}
         <View style={styles.breakdownContainer}>
-          <Text style={styles.breakdownTitle}>Expense Breakdown</Text>
-          <ScrollView style={styles.categoryBreakdown}>
-            {Object.entries(categoryTotals).map(
-              ([category, total]) =>
-                total > 0 && (
-                  <View key={category} style={styles.categoryRow}>
-                    <View style={styles.categoryInfo}>
-                      <Ionicons
-                        name={
-                          categories.find((c) => c.name === category)
-                            ?.icon as any
-                        }
-                        size={20}
-                        color="#333"
-                      />
-                      <Text style={styles.categoryName}>{category}</Text>
+          <View style={styles.breakdownHeader}>
+            <Text style={styles.breakdownTitle}>Expense Breakdown</Text>
+            
+            {/* Chart Type Selector */}
+            <View style={styles.chartTypeSelector}>
+              <TouchableOpacity
+                style={[
+                  styles.chartTypeButton,
+                  chartType === "list" && styles.activeChartTypeButton,
+                ]}
+                onPress={() => setChartType("list")}
+              >
+                <Ionicons
+                  name="list"
+                  size={18}
+                  color={chartType === "list" ? "#6C63FF" : "#999"}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.chartTypeButton,
+                  chartType === "visual" && styles.activeChartTypeButton,
+                ]}
+                onPress={() => setChartType("visual")}
+              >
+                <Ionicons
+                  name="bar-chart"
+                  size={18}
+                  color={chartType === "visual" ? "#6C63FF" : "#999"}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Display based on selected chart type */}
+          {chartType === "list" && (
+            <ScrollView style={styles.categoryBreakdown}>
+              {Object.entries(categoryTotals).map(
+                ([category, total]) =>
+                  total > 0 && (
+                    <View key={category} style={styles.categoryRow}>
+                      <View style={styles.categoryInfo}>
+                        <Ionicons
+                          name={
+                            categories.find((c) => c.name === category)
+                              ?.icon as any
+                          }
+                          size={20}
+                          color="#333"
+                        />
+                        <Text style={styles.categoryName}>{category}</Text>
+                      </View>
+                      <Text style={styles.categoryAmount}>
+                        {currency} {total.toFixed(2)}
+                      </Text>
                     </View>
-                    <Text style={styles.categoryAmount}>
-                      {currency} {total.toFixed(2)}
-                    </Text>
-                  </View>
-                )
-            )}
-          </ScrollView>
+                  )
+              )}
+            </ScrollView>
+          )}
+
+          {chartType === "visual" && expenses.length > 0 && (
+            <ScrollView style={styles.visualChartContainer}>
+              {Object.entries(categoryTotals)
+                .filter(([_, total]) => total > 0)
+                .map(([category, total], index) => {
+                  const percentage = (total / totalSpent) * 100;
+                  const barWidth = (total / getMaxAmount()) * screenWidth;
+                  const color = chartColors[index % chartColors.length];
+                  
+                  return (
+                    <View key={category} style={styles.chartItem}>
+                      <View style={styles.chartLabelContainer}>
+                        <Ionicons
+                          name={categories.find(c => c.name === category)?.icon as any}
+                          size={16}
+                          color="#333"
+                        />
+                        <Text style={styles.chartLabel}>{category}</Text>
+                        <Text style={styles.chartPercentage}>
+                          {percentage.toFixed(1)}%
+                        </Text>
+                      </View>
+                      <View style={styles.barContainer}>
+                        <View 
+                          style={[
+                            styles.bar, 
+                            { width: barWidth, backgroundColor: color }
+                          ]} 
+                        >
+                          {barWidth > 60 && (
+                            <Text style={styles.barAmountInside}>
+                              {currency} {total.toFixed(0)}
+                            </Text>
+                          )}
+                        </View>
+                        {barWidth <= 60 && (
+                          <Text style={styles.barAmountOutside}>
+                            {currency} {total.toFixed(0)}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              }
+            </ScrollView>
+          )}
+
+          {expenses.length === 0 && chartType === "visual" && (
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataText}>
+                Add expenses to see charts
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Expense List */}
@@ -428,14 +542,38 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  breakdownHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
   breakdownTitle: {
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 15,
     color: "#333",
   },
+  chartTypeSelector: {
+    flexDirection: "row",
+    backgroundColor: "#f0f0f0",
+    borderRadius: 20,
+    padding: 4,
+  },
+  chartTypeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  activeChartTypeButton: {
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
   categoryBreakdown: {
-    maxHeight: 120,
+    maxHeight: 200,
   },
   categoryRow: {
     flexDirection: "row",
@@ -458,6 +596,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     color: "#333",
+  },
+  visualChartContainer: {
+    maxHeight: 250,
+    paddingVertical: 10,
+  },
+  chartItem: {
+    marginBottom: 15,
+  },
+  chartLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  chartLabel: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  chartPercentage: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+  },
+  barContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 24,
+  },
+  bar: {
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+  },
+  barAmountInside: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
+    marginLeft: 10,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  barAmountOutside: {
+    marginLeft: 8,
+    fontSize: 12,
+    color: '#333',
+  },
+  noDataContainer: {
+    height: 200,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noDataText: {
+    fontSize: 16,
+    color: "#999",
   },
   expenseListContainer: {
     flex: 1,
