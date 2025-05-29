@@ -62,6 +62,16 @@ const _Layout = () => {
                 }}
             />
             <Tabs.Screen
+                name="itinerary"
+                options={{
+                    title: "Itinerary",
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="calendar-outline" color={color} size={size} />
+                    ),
+                    headerShown: false,
+                }}
+            />
+            <Tabs.Screen
                 name="SpendPlaner"
                 options={{
                     title: "Spend Planer",
